@@ -27,6 +27,17 @@ By eliminating upgradeability, I prioritize security, transparency, and user tru
 
 ## Key Design Decisions
 
+### Features
+
+- **Minimal Proxy Pattern**: Gas-efficient deployment using EIP-1167
+- **k-of-n Multi-signature**: Configurable threshold voting system
+- **EIP-712 Signatures**: Support for off-chain signature verification
+- **EIP-1271 Support**: Contract-based signer compatibility
+- **Proposal System**: Comprehensive proposal lifecycle management
+- **Multicall Execution**: Execute multiple transactions atomically
+- **Signer Management**: Add/remove signers through governance
+- **Replay Protection**: Built-in nonce system prevents signature replay attacks
+
 ### Voting Architecture: Historical Preservation + Dynamic Validation
 
 The system employs a unique approach to vote management that balances data consistency with security:
@@ -66,7 +77,7 @@ The system employs a unique approach to vote management that balances data consi
 - Expired proposals retain state but cannot execute
 - States: NotStarted → Proposed → Executed/Cancelled
 
-## Security Features
+## Security Considerations
 
 ### Replay Protection
 - Each signer has an individual nonce counter
@@ -83,17 +94,6 @@ The system employs a unique approach to vote management that balances data consi
 - Real-time validation of signer status during execution
 - Historical vote preservation with dynamic validity checking
 - Signer limit enforcement (maximum 50 signers)
-
-## Features
-
-- **Minimal Proxy Pattern**: Gas-efficient deployment using EIP-1167
-- **k-of-n Multi-signature**: Configurable threshold voting system
-- **EIP-712 Signatures**: Support for off-chain signature verification
-- **EIP-1271 Support**: Contract-based signer compatibility
-- **Proposal System**: Comprehensive proposal lifecycle management
-- **Multicall Execution**: Execute multiple transactions atomically
-- **Signer Management**: Add/remove signers through governance
-- **Replay Protection**: Built-in nonce system prevents signature replay attacks
 
 ## Architecture
 
