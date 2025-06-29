@@ -1,4 +1,4 @@
-# MultiSig Wallet Implementation
+# MultiSig Wallet Design & Implementation Doc
 
 A complete implementation of a multi-signature wallet system using the Minimal Proxy Pattern (EIP-1167) with advanced features including EIP-712 signature support and comprehensive proposal management.
 
@@ -95,7 +95,7 @@ uint256 proposalId = MultiSigWallet(wallet).propose(
 
 **Direct voting:**
 ```solidity
-MultiSigWallet(wallet).vote(proposalId);
+MultiSigWallet(wallet).voteFor(proposalId);
 ```
 
 **Off-chain signature voting:**
@@ -103,7 +103,7 @@ MultiSigWallet(wallet).vote(proposalId);
 // Generate signature off-chain using EIP-712
 bytes memory signature = generateEIP712Signature(proposalId, true, voterPrivateKey);
 
-// Submit vote with signature
+// Submit vote with signature (support=true for yes, false for cancel)
 MultiSigWallet(wallet).voteOnBehalfOf(proposalId, voter, true, signature);
 ```
 
@@ -118,15 +118,14 @@ MultiSigWallet(wallet).execute(proposalId);
 ### Proposal Management
 
 - `propose()` - Create new proposal (proposer automatically votes)
-- `vote()` - Vote on proposal
-- `cancelVote()` - Remove vote from proposal
-- `execute()` - Execute approved proposal
+- `voteFor()` - Vote yes on proposal
+- `cancelVoteFor()` - Remove yes vote from proposal
+- `execute()` - Execute approved proposal (anyone can call)
 - `cancelProposal()` - Cancel proposal (proposer or governance only)
 
 ### Signature-based Voting
 
-- `voteOnBehalfOf()` - Vote using EIP-712/EIP-1271 signature
-- `cancelVoteOnBehalfOf()` - Cancel vote using signature
+- `voteOnBehalfOf()` - Vote using EIP-712/EIP-1271 signature (support parameter controls yes/cancel)
 
 ### Signer Management
 
@@ -136,8 +135,11 @@ MultiSigWallet(wallet).execute(proposalId);
 ### View Functions
 
 - `getSigners()` - Get all current signers
-- `getProposal()` - Get proposal details
-- `hasVoted()` - Check if address voted on proposal
+- `getSignerCount()` - Get number of current signers
+- `getProposal()` - Get proposal details (without vote counts)
+- `hasVoted()` - Check if address voted yes on proposal
+- `getYesVoters()` - Get historical list of yes voters (includes removed signers)
+- `getValidYesVotes()` - Get current valid yes votes (only current signers)
 - `getDomainSeparator()` - Get EIP-712 domain separator
 
 ## Security Features
@@ -154,8 +156,46 @@ MultiSigWallet(wallet).execute(proposalId);
 
 ### Execution Safety
 - All-or-nothing execution (atomic multicall)
-- Validates signer status before execution
-- Removes votes from de-authorized signers
+- Real-time validation of signer status during execution
+- Historical vote preservation with dynamic validity checking
+- Signer limit enforcement (maximum 255 signers)
+
+## Voting Architecture
+
+### Historical Vote Preservation
+The system maintains complete voting history for transparency and consistency:
+
+- **Vote History**: Once cast, votes remain in storage permanently
+- **Dynamic Validation**: Execution checks current signer status in real-time
+- **Consistent Behavior**: All proposals (past and present) show the same voting data
+
+### Signer Management Impact
+When signers are added or removed:
+
+- **Removed Signers**: Their historical votes remain visible but don't count toward execution
+- **Re-added Signers**: Previous votes immediately become valid again without re-voting
+- **New Signers**: Can vote on existing proposals if not expired
+
+This approach ensures data consistency while maintaining security through real-time validation.
+
+## Proposal States
+
+The system uses a streamlined state management approach:
+
+```solidity
+enum ProposalStatus {
+    NotStarted,  // Default state for non-existent proposals
+    Proposed,    // Proposal is active and open for voting
+    Executed,    // Proposal has been executed
+    Cancelled    // Proposal has been cancelled
+}
+```
+
+### State Transitions
+- **NotStarted → Proposed**: When `propose()` is called
+- **Proposed → Executed**: When `execute()` is called with sufficient votes
+- **Proposed → Cancelled**: When `cancelProposal()` is called
+- **Expired Proposals**: Handled via timestamp checks, not state changes
 
 ## EIP-712 Signature Structure
 
@@ -198,6 +238,30 @@ address[] memory targets = [address(wallet)];
 uint256[] memory values = [0];
 bytes[] memory calldatas = [abi.encodeWithSignature("addSigner(address)", newSigner)];
 ```
+
+## Important Notes & Limitations
+
+### Signer Limits
+- Maximum of 255 signers per wallet (uint8 limitation)
+- Minimum of 1 signer required at all times
+- Cannot remove the last remaining signer
+
+### Voting Behavior
+- Only "yes" votes are supported (no explicit "no" votes)
+- Proposer automatically votes "yes" when creating proposal
+- Majority threshold is `> signers.length / 2` (more than half)
+- Re-added signers' previous votes remain valid without re-voting
+
+### Proposal Management
+- Proposals use auto-incrementing IDs starting from 0
+- Cancelled proposals don't revert the ID counter
+- Expired proposals cannot be executed but retain their state
+- Anyone can execute a proposal once it has sufficient valid votes
+
+### Gas Considerations
+- Execution cost scales with number of targets in proposal
+- Vote counting scales with historical voter count
+- Consider gas limits for proposals with many operations
 
 ## Dependencies
 
