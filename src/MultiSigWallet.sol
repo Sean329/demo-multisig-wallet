@@ -26,9 +26,11 @@ contract MultiSigWallet is EIP712, Initializable {
     }
 
     // Proposal struct
+    //@dev This struct does not need to store the yesCount because the execute function will
+    //     always dynamically calculate the validYesVotes to handle the situation where a 
+    //     removed signer has voted yes before being removed.
     struct Proposal {
         address proposer;
-        uint8 yesCount;
         uint256 expirationTimestamp;
         address[] yesVoters;  // Array of addresses that voted yes
         mapping(address => bool) hasVotedYes;  // Quick lookup for yes votes
@@ -152,7 +154,6 @@ contract MultiSigWallet is EIP712, Initializable {
         
         proposal.proposer = msg.sender;
         proposal.expirationTimestamp = expirationTimestamp;
-        proposal.yesCount = 1;
         proposal.yesVoters.push(msg.sender);
         proposal.hasVotedYes[msg.sender] = true;
         proposal.status = ProposalStatus.Proposed;
@@ -190,16 +191,16 @@ contract MultiSigWallet is EIP712, Initializable {
      * @notice Vote on a proposal
      * @param proposalId The ID of the proposal to vote on
      */
-    function vote(uint256 proposalId) external onlySigner {
-        _vote(proposalId, msg.sender);
+    function voteFor(uint256 proposalId) external onlySigner {
+        _voteFor(proposalId, msg.sender);
     }
 
     /**
      * @notice Cancel a vote on a proposal
      * @param proposalId The ID of the proposal to cancel the vote on
      */
-    function cancelVote(uint256 proposalId) external onlySigner {
-        _cancelVote(proposalId, msg.sender);
+    function cancelVoteFor(uint256 proposalId) external onlySigner {
+        _cancelVoteFor(proposalId, msg.sender);
     }
 
     /**
@@ -237,15 +238,16 @@ contract MultiSigWallet is EIP712, Initializable {
         nonces[voter]++;
         
         if (support) {
-            _vote(proposalId, voter);
+            _voteFor(proposalId, voter);
         } else {
-            _cancelVote(proposalId, voter);
+            _cancelVoteFor(proposalId, voter);
         }
     }
 
     /**
      * @notice Execute a proposal
      * @param proposalId The ID of the proposal to execute
+     * @dev This function is callable by anyone.
      */
     function execute(uint256 proposalId) external {
         Proposal storage proposal = proposals[proposalId];
@@ -253,23 +255,23 @@ contract MultiSigWallet is EIP712, Initializable {
         require(block.timestamp <= proposal.expirationTimestamp, "Proposal expired");
         
         // Recount valid votes by checking if yes voters are still signers
-        uint8 validYesVotes = 0;
+        uint256 validYesVotes = 0;
         
         // Check each yes voter to see if they're still a valid signer
         for (uint256 i = 0; i < proposal.yesVoters.length; i++) {
             address voter = proposal.yesVoters[i];
             if (isSigner[voter]) {
                 validYesVotes++;
-            } else {
-                // Clean up votes from removed signers by removing from hasVotedYes mapping
-                proposal.hasVotedYes[voter] = false;
             }
+            // Note: We don't clean up hasVotedYes mapping to maintain historical consistency
+            // and avoid the complexity of array cleanup
         }
         
-        // Note: We don't clean up the yesVoters array here to avoid gas-expensive array operations
-        // The array cleanup can be done in a separate maintenance function if needed
+        // Note: We preserve all voting history for consistency across all proposals
+        // Only current signers' votes count toward execution, but historical data remains intact
         
-        proposal.yesCount = validYesVotes;
+        // Don't update proposal.yesCount to maintain consistency
+        // Use real-time calculated validYesVotes for execution check
         require(validYesVotes > signers.length / 2, "Insufficient votes");
         
         // CEI pattern to prevent reentrancy
@@ -284,26 +286,24 @@ contract MultiSigWallet is EIP712, Initializable {
         emit ProposalExecuted(proposalId);
     }
 
-    function _vote(uint256 proposalId, address voter) internal {
+    function _voteFor(uint256 proposalId, address voter) internal {
         Proposal storage proposal = proposals[proposalId];
         require(proposal.status == ProposalStatus.Proposed, "Invalid proposal status");
         require(block.timestamp <= proposal.expirationTimestamp, "Proposal expired");
-        require(!proposal.hasVotedYes[voter], "Already voted");
+        require(!proposal.hasVotedYes[voter], "Already voted yes");
         
         proposal.hasVotedYes[voter] = true;
         proposal.yesVoters.push(voter);
-        proposal.yesCount++;
         
         emit Voted(proposalId, voter);
     }
 
-    function _cancelVote(uint256 proposalId, address voter) internal {
+    function _cancelVoteFor(uint256 proposalId, address voter) internal {
         Proposal storage proposal = proposals[proposalId];
         require(proposal.status == ProposalStatus.Proposed, "Invalid proposal status");
-        require(proposal.hasVotedYes[voter], "Has not voted");
+        require(proposal.hasVotedYes[voter], "Has not voted yes");
         
         proposal.hasVotedYes[voter] = false;
-        proposal.yesCount--;
         
         // Remove from yesVoters array
         for (uint256 i = 0; i < proposal.yesVoters.length; i++) {
@@ -336,7 +336,6 @@ contract MultiSigWallet is EIP712, Initializable {
 
     function getProposal(uint256 proposalId) external view returns (
         address proposer,
-        uint8 yesCount,
         uint256 expirationTimestamp,
         ProposalStatus status,
         address[] memory targets,
@@ -346,7 +345,6 @@ contract MultiSigWallet is EIP712, Initializable {
         Proposal storage proposal = proposals[proposalId];
         return (
             proposal.proposer,
-            proposal.yesCount,
             proposal.expirationTimestamp,
             proposal.status,
             proposal.targets,
@@ -359,8 +357,25 @@ contract MultiSigWallet is EIP712, Initializable {
         return proposals[proposalId].hasVotedYes[voter];
     }
 
+    //@dev yesVoters is a historical record of all voters for a proposal, namely,
+    //     it is not updated when a signer is removed.
     function getYesVoters(uint256 proposalId) external view returns (address[] memory) {
         return proposals[proposalId].yesVoters;
+    }
+
+    function getValidYesVotes(uint256 proposalId) external view returns (uint256) {
+        Proposal storage proposal = proposals[proposalId];
+        uint256 validYesVotes = 0;
+        
+        // Count votes from current signers only
+        for (uint256 i = 0; i < proposal.yesVoters.length; i++) {
+            address voter = proposal.yesVoters[i];
+            if (isSigner[voter]) {
+                validYesVotes++;
+            }
+        }
+        
+        return validYesVotes;
     }
 
     function getDomainSeparator() external view returns (bytes32) {
