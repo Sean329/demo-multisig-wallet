@@ -182,8 +182,9 @@ contract MultiSigWallet is EIP712, Initializable {
         Proposal storage proposal = proposals[proposalId];
         require(proposal.status == ProposalStatus.Proposed, "Invalid proposal status");
         require(
-            msg.sender == proposal.proposer || msg.sender == address(this),
-            "Only proposer or self can cancel"
+            (msg.sender == proposal.proposer && isSigner[msg.sender]) ||
+            msg.sender == address(this),
+            "Only current signer proposer or self can cancel"
         );
         
         proposal.status = ProposalStatus.Cancelled;

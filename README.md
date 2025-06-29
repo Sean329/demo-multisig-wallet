@@ -247,7 +247,7 @@ bytes[] memory calldatas = [abi.encodeWithSignature("addSigner(address)", newSig
 
 - **Execution Cost**: Scales with number of targets in proposal
 - **Vote Counting**: Scales with historical voter count (not current signer count)
-- **Storage Optimization**: Uses uint8 for signer limits, minimal proxy pattern for deployment
+- **Storage Optimization**: 50-signer limit for gas efficiency, minimal proxy pattern for deployment
 - **Gas Limits**: Consider transaction gas limits for proposals with many operations
 
 ## Dependencies
