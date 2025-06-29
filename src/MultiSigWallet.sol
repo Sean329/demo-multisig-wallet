@@ -40,6 +40,9 @@ contract MultiSigWallet is EIP712, Initializable {
         bytes[] calldatas;
     }
 
+    // Constants
+    uint8 public constant MAX_SIGNERS = 50;
+
     // State variables
     address[] public signers;
     mapping(address => bool) public isSigner;
@@ -81,7 +84,7 @@ contract MultiSigWallet is EIP712, Initializable {
      */
     function initialize(address[] memory _signers) external initializer {
         require(_signers.length > 0, "At least one signer required");
-        require(_signers.length <= type(uint8).max, "Too many signers");
+        require(_signers.length <= MAX_SIGNERS, "Too many signers");
         
         for (uint256 i = 0; i < _signers.length; i++) {
             require(_signers[i] != address(0), "Invalid signer address");
@@ -100,7 +103,7 @@ contract MultiSigWallet is EIP712, Initializable {
     function addSigner(address newSigner) external onlySelf {
         require(newSigner != address(0), "Invalid signer address");
         require(!isSigner[newSigner], "Already a signer");
-        require(signers.length < type(uint8).max, "Too many signers");
+        require(signers.length < MAX_SIGNERS, "Too many signers");
         
         signers.push(newSigner);
         isSigner[newSigner] = true;

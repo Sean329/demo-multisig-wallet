@@ -50,7 +50,7 @@ The system employs a unique approach to vote management that balances data consi
 ### System Limitations & Constraints
 
 **Signer Constraints:**
-- Maximum of 255 signers per wallet (uint8 optimization)
+- Maximum of 50 signers per wallet (gas optimization + practical limit)
 - Minimum of 1 signer required at all times
 - Cannot remove the last remaining signer
 
@@ -82,7 +82,7 @@ The system employs a unique approach to vote management that balances data consi
 - All-or-nothing execution (atomic multicall)
 - Real-time validation of signer status during execution
 - Historical vote preservation with dynamic validity checking
-- Signer limit enforcement (maximum 255 signers)
+- Signer limit enforcement (maximum 50 signers)
 
 ## Features
 
