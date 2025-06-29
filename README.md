@@ -192,7 +192,7 @@ struct Vote {
 ### 🔒 Critical Security Tests
 
 #### Access Control & Privilege Escalation
-- [ ] **CRITICAL**: Removed signers cannot cancel proposals (security fix needed)
+- [ ] Removed signers cannot cancel proposals even if he was the proposer
 - [ ] onlySigner/onlySelf modifiers work correctly
 - [ ] Non-signers blocked from restricted functions
 - [ ] Removed signers cannot vote
@@ -221,12 +221,6 @@ struct Vote {
 - [ ] Multiple concurrent proposals
 - [ ] View functions return accurate data after state changes
 - [ ] Historical consistency across signer changes
-
-### 🌐 Integration Tests
-- [ ] ERC20/721 token operations via proposals
-- [ ] External contract calls with proper error handling
-- [ ] Complex treasury management scenarios
-- [ ] Failed external calls don't break execution flow
 
 ## Dependencies
 
