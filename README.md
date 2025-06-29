@@ -250,6 +250,226 @@ bytes[] memory calldatas = [abi.encodeWithSignature("addSigner(address)", newSig
 - **Storage Optimization**: 50-signer limit for gas efficiency, minimal proxy pattern for deployment
 - **Gas Limits**: Consider transaction gas limits for proposals with many operations
 
+## Testing TODO
+
+### 🏭 Factory Contract Tests
+- [ ] **Deployment**
+  - [ ] Factory deploys with correct implementation address
+  - [ ] Implementation contract is properly initialized (disabled)
+- [ ] **Wallet Creation**
+  - [ ] Create wallet with valid signers
+  - [ ] Reject empty signer array
+  - [ ] Reject invalid signer addresses (zero address)
+  - [ ] Reject duplicate signers
+  - [ ] Reject exceeding MAX_SIGNERS limit
+  - [ ] Deterministic wallet creation works correctly
+  - [ ] Predicted addresses match actual deployment
+- [ ] **Tracking & Queries**
+  - [ ] Deployed wallets are tracked correctly
+  - [ ] Pagination works for large wallet lists
+  - [ ] isWallet mapping accurate
+  - [ ] getWalletInfo returns correct data
+
+### 🔐 Core Wallet Functionality Tests
+
+#### Initialization
+- [ ] **Valid Initialization**
+  - [ ] Initialize with 1 signer
+  - [ ] Initialize with maximum signers (50)
+  - [ ] Initialize with mixed EOA and contract signers
+- [ ] **Invalid Initialization**
+  - [ ] Reject double initialization
+  - [ ] Reject initialization of implementation contract
+  - [ ] Reject invalid signer configurations
+
+#### Signer Management
+- [ ] **Adding Signers**
+  - [ ] Add signer through governance (self-call)
+  - [ ] Reject adding existing signer
+  - [ ] Reject adding zero address
+  - [ ] Reject exceeding MAX_SIGNERS
+  - [ ] Reject non-governance calls
+  - [ ] Events emitted correctly
+- [ ] **Removing Signers**
+  - [ ] Remove signer through governance
+  - [ ] Reject removing non-existent signer
+  - [ ] Reject removing last signer
+  - [ ] Reject non-governance calls
+  - [ ] Array cleanup works correctly
+  - [ ] Events emitted correctly
+
+### 📋 Proposal Lifecycle Tests
+
+#### Proposal Creation
+- [ ] **Valid Proposals**
+  - [ ] Create proposal with single target
+  - [ ] Create proposal with multiple targets (multicall)
+  - [ ] Create proposal with ETH transfers
+  - [ ] Create proposal with contract calls
+  - [ ] Create proposal with mixed operations
+  - [ ] Proposer automatically votes yes
+  - [ ] ProposalID increments correctly
+- [ ] **Invalid Proposals**
+  - [ ] Reject non-signer proposal creation
+  - [ ] Reject empty proposal (no targets)
+  - [ ] Reject array length mismatches
+  - [ ] Reject expired timestamps
+  - [ ] Reject invalid target addresses
+
+#### Voting Mechanism
+- [ ] **Direct Voting**
+  - [ ] Signer can vote for proposal
+  - [ ] Signer can cancel their vote
+  - [ ] Reject double voting
+  - [ ] Reject voting by non-signers
+  - [ ] Reject voting on invalid proposals
+  - [ ] Reject voting on expired proposals
+  - [ ] Vote events emitted correctly
+- [ ] **Signature-based Voting**
+  - [ ] Valid EIP-712 signature voting
+  - [ ] Valid EIP-1271 contract signature voting
+  - [ ] Reject invalid signatures
+  - [ ] Reject signature replay (nonce protection)
+  - [ ] Reject voting for non-signers
+  - [ ] Nonce increments correctly
+  - [ ] Both support=true/false work correctly
+
+#### Proposal Execution
+- [ ] **Successful Execution**
+  - [ ] Execute with exactly majority votes
+  - [ ] Execute with more than majority votes
+  - [ ] Execute multicall proposals atomically
+  - [ ] Execute ETH transfer proposals
+  - [ ] Execute contract interaction proposals
+  - [ ] Anyone can execute approved proposals
+- [ ] **Failed Execution**
+  - [ ] Reject execution with insufficient votes
+  - [ ] Reject execution of expired proposals
+  - [ ] Reject execution of already executed proposals
+  - [ ] Reject execution of cancelled proposals
+  - [ ] All-or-nothing execution (one failure = all revert)
+
+#### Proposal Cancellation
+- [ ] **Valid Cancellation**
+  - [ ] Proposer can cancel their proposal
+  - [ ] Governance can cancel any proposal
+- [ ] **Invalid Cancellation**
+  - [ ] **CRITICAL**: Reject cancellation by removed proposer (security fix)
+  - [ ] Reject cancellation by non-proposer
+  - [ ] Reject cancellation of executed proposals
+  - [ ] Reject cancellation of already cancelled proposals
+
+### 🔒 Security & Edge Case Tests
+
+#### Access Control
+- [ ] **Modifier Verification**
+  - [ ] onlySigner blocks non-signers
+  - [ ] onlySelf blocks external calls
+  - [ ] Functions accessible to correct roles only
+- [ ] **Privilege Escalation**
+  - [ ] Removed signers cannot vote
+  - [ ] **CRITICAL**: Removed signers cannot cancel proposals
+  - [ ] Non-signers cannot access restricted functions
+
+#### Signer State Changes Impact
+- [ ] **Dynamic Validation**
+  - [ ] Execute recalculates valid votes correctly
+  - [ ] Removed signer votes don't count toward execution
+  - [ ] Re-added signer votes immediately count
+  - [ ] Historical vote data preserved correctly
+- [ ] **Race Conditions**
+  - [ ] Signer removal during active proposals
+  - [ ] Multiple concurrent votes
+  - [ ] Execution during signer changes
+
+#### Signature Security
+- [ ] **EIP-712 Protection**
+  - [ ] Domain separator prevents cross-contract replay
+  - [ ] Nonce prevents same-transaction replay
+  - [ ] Invalid signatures rejected
+  - [ ] Signature malleability handled
+- [ ] **EIP-1271 Contract Signatures**
+  - [ ] Valid contract signatures accepted
+  - [ ] Invalid contract signatures rejected
+  - [ ] Failed contract calls handled gracefully
+
+#### Numerical & Boundary Conditions
+- [ ] **Limits Testing**
+  - [ ] Exactly 50 signers (MAX_SIGNERS)
+  - [ ] Single signer wallet operations
+  - [ ] Maximum proposal targets/values/calldatas
+  - [ ] Large ETH values in proposals
+- [ ] **Integer Arithmetic**
+  - [ ] Majority calculation (> signers.length / 2)
+  - [ ] No integer overflow in vote counting
+  - [ ] ProposalID increment overflow (unlikely but test)
+
+### 🔄 State Transition Tests
+- [ ] **Proposal Status Flow**
+  - [ ] NotStarted → Proposed (creation)
+  - [ ] Proposed → Executed (execution)
+  - [ ] Proposed → Cancelled (cancellation)
+  - [ ] Invalid state transitions blocked
+- [ ] **Concurrent Operations**
+  - [ ] Multiple proposals can exist simultaneously
+  - [ ] Voting on multiple proposals
+  - [ ] Signer changes during multiple active proposals
+
+### 🌐 Integration & Interaction Tests
+- [ ] **External Contract Calls**
+  - [ ] ERC20 token transfers
+  - [ ] ERC721 NFT operations
+  - [ ] Custom contract interactions
+  - [ ] Failed external calls handled correctly
+- [ ] **Complex Scenarios**
+  - [ ] Treasury management workflows
+  - [ ] Governance parameter changes
+  - [ ] Emergency response procedures
+  - [ ] Multi-step protocol interactions
+
+### ⛽ Gas & Performance Tests
+- [ ] **Gas Optimization**
+  - [ ] Vote counting scales reasonably with history
+  - [ ] Execution cost scales with proposal complexity
+  - [ ] Storage access patterns optimized
+- [ ] **DOS Resistance**
+  - [ ] Large yesVoters array doesn't block execution
+  - [ ] Many proposals don't affect new proposal creation
+  - [ ] Signer removal with large history doesn't fail
+
+### 🧪 Regression & Upgrade Tests
+- [ ] **Historical Consistency**
+  - [ ] Old proposals maintain correct vote counts
+  - [ ] Signer changes don't affect past proposal data
+  - [ ] All view functions return consistent data
+- [ ] **Proxy Pattern**
+  - [ ] Multiple wallet instances work independently
+  - [ ] Implementation upgrades don't affect proxies
+  - [ ] Factory deployment creates identical bytecode
+
+### 📊 View Function Tests
+- [ ] **Data Integrity**
+  - [ ] getSigners returns current signers
+  - [ ] getProposal returns accurate data
+  - [ ] hasVoted reflects actual voting status
+  - [ ] getYesVoters includes historical voters
+  - [ ] getValidYesVotes counts only current signers
+- [ ] **Edge Cases**
+  - [ ] Queries on non-existent proposals
+  - [ ] Queries after signer changes
+  - [ ] Queries on cancelled/executed proposals
+
+### 🎭 Adversarial Testing
+- [ ] **Front-running Attacks**
+  - [ ] Vote execution race conditions
+  - [ ] Signer addition/removal timing attacks
+- [ ] **MEV Considerations**
+  - [ ] Proposal execution timing
+  - [ ] Multi-block attack scenarios
+- [ ] **Social Engineering**
+  - [ ] Malicious proposal data
+  - [ ] Deceptive function calls in proposals
+
 ## Dependencies
 
 - OpenZeppelin Contracts v4.9+
