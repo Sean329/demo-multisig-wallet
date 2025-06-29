@@ -25,6 +25,65 @@ This design choice aligns with industry standards - **Gnosis Safe**, one of the 
 
 By eliminating upgradeability, I prioritize security, transparency, and user trust while maintaining the system's core flexibility through its arbitrary contract execution capabilities.
 
+## Key Design Decisions
+
+### Voting Architecture: Historical Preservation + Dynamic Validation
+
+The system employs a unique approach to vote management that balances data consistency with security:
+
+**Design Philosophy:**
+- **Vote History Immutable**: Once cast, votes remain in storage permanently
+- **Validation Dynamic**: Execution checks current signer status in real-time
+- **Behavior Consistent**: All proposals show the same voting data regardless of when viewed
+
+**Signer Management Impact:**
+- **Removed Signers**: Historical votes remain visible but don't count toward execution
+- **Re-added Signers**: Previous votes immediately become valid again without re-voting
+- **New Signers**: Can vote on existing proposals if not expired
+
+**Why This Approach?**
+1. **Data Consistency**: Eliminates confusion between "historical" vs "current" vote counts
+2. **Gas Efficiency**: Avoids expensive array cleanup operations
+3. **User Experience**: Re-added signers don't need to re-vote on existing proposals
+4. **Transparency**: Complete voting history preserved for audit purposes
+
+### System Limitations & Constraints
+
+**Signer Constraints:**
+- Maximum of 255 signers per wallet (uint8 optimization)
+- Minimum of 1 signer required at all times
+- Cannot remove the last remaining signer
+
+**Voting Rules:**
+- Only "yes" votes supported (no explicit "no" votes)
+- Majority threshold: `> signers.length / 2` (more than half)
+- Proposer automatically votes "yes" when creating proposal
+- Execution open to anyone once threshold met
+
+**Proposal Management:**
+- Auto-incrementing IDs starting from 0
+- Cancelled proposals don't revert ID counter
+- Expired proposals retain state but cannot execute
+- States: NotStarted → Proposed → Executed/Cancelled
+
+## Security Features
+
+### Replay Protection
+- Each signer has an individual nonce counter
+- Nonces prevent signature replay across transactions
+- Domain separator prevents cross-contract replay
+
+### Governance Protection
+- Only contract itself can modify signers
+- Requires majority approval for signer changes
+- Prevents unauthorized access to critical functions
+
+### Execution Safety
+- All-or-nothing execution (atomic multicall)
+- Real-time validation of signer status during execution
+- Historical vote preservation with dynamic validity checking
+- Signer limit enforcement (maximum 255 signers)
+
 ## Features
 
 - **Minimal Proxy Pattern**: Gas-efficient deployment using EIP-1167
@@ -57,7 +116,7 @@ MultiSigWallet (Implementation)
 ├── Signer management (add/remove through governance)
 ├── EIP-712 signature verification
 ├── Multicall execution
-└── Replay protection via nonces
+└── Replay protection via nonce and domain separator
 ```
 
 ## Usage
@@ -113,7 +172,7 @@ MultiSigWallet(wallet).voteOnBehalfOf(proposalId, voter, true, signature);
 MultiSigWallet(wallet).execute(proposalId);
 ```
 
-## Key Functions
+## API Reference
 
 ### Proposal Management
 
@@ -141,61 +200,6 @@ MultiSigWallet(wallet).execute(proposalId);
 - `getYesVoters()` - Get historical list of yes voters (includes removed signers)
 - `getValidYesVotes()` - Get current valid yes votes (only current signers)
 - `getDomainSeparator()` - Get EIP-712 domain separator
-
-## Security Features
-
-### Replay Protection
-- Each signer has an individual nonce counter
-- Nonces prevent signature replay across transactions
-- Domain separator prevents cross-contract replay
-
-### Governance Protection
-- Only contract itself can modify signers
-- Requires majority approval for signer changes
-- Prevents unauthorized access to critical functions
-
-### Execution Safety
-- All-or-nothing execution (atomic multicall)
-- Real-time validation of signer status during execution
-- Historical vote preservation with dynamic validity checking
-- Signer limit enforcement (maximum 255 signers)
-
-## Voting Architecture
-
-### Historical Vote Preservation
-The system maintains complete voting history for transparency and consistency:
-
-- **Vote History**: Once cast, votes remain in storage permanently
-- **Dynamic Validation**: Execution checks current signer status in real-time
-- **Consistent Behavior**: All proposals (past and present) show the same voting data
-
-### Signer Management Impact
-When signers are added or removed:
-
-- **Removed Signers**: Their historical votes remain visible but don't count toward execution
-- **Re-added Signers**: Previous votes immediately become valid again without re-voting
-- **New Signers**: Can vote on existing proposals if not expired
-
-This approach ensures data consistency while maintaining security through real-time validation.
-
-## Proposal States
-
-The system uses a streamlined state management approach:
-
-```solidity
-enum ProposalStatus {
-    NotStarted,  // Default state for non-existent proposals
-    Proposed,    // Proposal is active and open for voting
-    Executed,    // Proposal has been executed
-    Cancelled    // Proposal has been cancelled
-}
-```
-
-### State Transitions
-- **NotStarted → Proposed**: When `propose()` is called
-- **Proposed → Executed**: When `execute()` is called with sufficient votes
-- **Proposed → Cancelled**: When `cancelProposal()` is called
-- **Expired Proposals**: Handled via timestamp checks, not state changes
 
 ## EIP-712 Signature Structure
 
@@ -239,29 +243,12 @@ uint256[] memory values = [0];
 bytes[] memory calldatas = [abi.encodeWithSignature("addSigner(address)", newSigner)];
 ```
 
-## Important Notes & Limitations
+## Gas Considerations & Performance
 
-### Signer Limits
-- Maximum of 255 signers per wallet (uint8 limitation)
-- Minimum of 1 signer required at all times
-- Cannot remove the last remaining signer
-
-### Voting Behavior
-- Only "yes" votes are supported (no explicit "no" votes)
-- Proposer automatically votes "yes" when creating proposal
-- Majority threshold is `> signers.length / 2` (more than half)
-- Re-added signers' previous votes remain valid without re-voting
-
-### Proposal Management
-- Proposals use auto-incrementing IDs starting from 0
-- Cancelled proposals don't revert the ID counter
-- Expired proposals cannot be executed but retain their state
-- Anyone can execute a proposal once it has sufficient valid votes
-
-### Gas Considerations
-- Execution cost scales with number of targets in proposal
-- Vote counting scales with historical voter count
-- Consider gas limits for proposals with many operations
+- **Execution Cost**: Scales with number of targets in proposal
+- **Vote Counting**: Scales with historical voter count (not current signer count)
+- **Storage Optimization**: Uses uint8 for signer limits, minimal proxy pattern for deployment
+- **Gas Limits**: Consider transaction gas limits for proposals with many operations
 
 ## Dependencies
 
