@@ -119,59 +119,6 @@ MultiSigWallet (Implementation)
 └── Replay protection via nonce and domain separator
 ```
 
-## Usage
-
-### 1. Deploy Factory
-
-```solidity
-MultiSigWalletFactory factory = new MultiSigWalletFactory();
-```
-
-### 2. Create Wallet Instance
-
-```solidity
-address[] memory signers = [signer1, signer2, signer3];
-address wallet = factory.createWallet(signers);
-```
-
-### 3. Create Proposal
-
-```solidity
-address[] memory targets = [targetContract];
-uint256[] memory values = [0]; // ETH to send
-bytes[] memory calldatas = [abi.encodeWithSignature("someFunction()")];
-uint256 expiration = block.timestamp + 7 days;
-
-uint256 proposalId = MultiSigWallet(wallet).propose(
-    targets,
-    values,
-    calldatas,
-    expiration
-);
-```
-
-### 4. Vote on Proposal
-
-**Direct voting:**
-```solidity
-MultiSigWallet(wallet).voteFor(proposalId);
-```
-
-**Off-chain signature voting:**
-```solidity
-// Generate signature off-chain using EIP-712
-bytes memory signature = generateEIP712Signature(proposalId, true, voterPrivateKey);
-
-// Submit vote with signature (support=true for yes, false for cancel)
-MultiSigWallet(wallet).voteOnBehalfOf(proposalId, voter, true, signature);
-```
-
-### 5. Execute Proposal
-
-```solidity
-MultiSigWallet(wallet).execute(proposalId);
-```
-
 ## API Reference
 
 ### Proposal Management
@@ -216,39 +163,6 @@ struct Vote {
 - version: "1"
 - chainId: Current chain ID
 - verifyingContract: Wallet address
-
-## Example Usage Scenarios
-
-### 1. Treasury Management
-```solidity
-// Transfer 100 ETH to recipient
-address[] memory targets = [recipient];
-uint256[] memory values = [100 ether];
-bytes[] memory calldatas = [""];
-```
-
-### 2. Contract Interaction
-```solidity
-// Call external contract function
-address[] memory targets = [targetContract];
-uint256[] memory values = [0];
-bytes[] memory calldatas = [abi.encodeWithSignature("mint(address,uint256)", recipient, amount)];
-```
-
-### 3. Signer Management
-```solidity
-// Add new signer
-address[] memory targets = [address(wallet)];
-uint256[] memory values = [0];
-bytes[] memory calldatas = [abi.encodeWithSignature("addSigner(address)", newSigner)];
-```
-
-## Gas Considerations & Performance
-
-- **Execution Cost**: Scales with number of targets in proposal
-- **Vote Counting**: Scales with historical voter count (not current signer count)
-- **Storage Optimization**: 50-signer limit for gas efficiency, minimal proxy pattern for deployment
-- **Gas Limits**: Consider transaction gas limits for proposals with many operations
 
 ## Testing TODO
 
