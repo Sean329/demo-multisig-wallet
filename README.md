@@ -93,7 +93,7 @@ The system employs a unique approach to vote management that balances data consi
 - All-or-nothing execution (atomic multicall)
 - Real-time validation of signer status during execution
 - Historical vote preservation with dynamic validity checking
-- Signer limit enforcement (maximum 50 signers)
+- CEI pattern in the execute() function to prevent reentrancy
 
 ## Architecture
 
