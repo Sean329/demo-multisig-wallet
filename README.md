@@ -164,7 +164,7 @@ struct Vote {
 - chainId: Current chain ID
 - verifyingContract: Wallet address
 
-## Testing TODO
+## Testing TODO List
 
 ### 🏭 Factory Tests
 - [ ] Deploy factory with valid implementation
